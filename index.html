@@ -1,0 +1,868 @@
+<title>아지트 광산</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<style>
+  /* One portrait screen: cave fills it, gem owns the centre, crew stands on the floor.
+     Single committed look - a lamplit cave - so there is no second theme. */
+  :root {
+    --rock-deep:   #3b3029;
+    --rock:        #6a5a4e;
+    --floor:       #c79a68;
+    --gem-core:    #a86ad6;
+    --gem-light:   #d7a9f2;
+    --gem-dark:    #6c3f96;
+    --gem-glint:   #fdf3ff;
+    --shard:       #e8c7ff;
+    --gold:        #f4c45a;
+    --cream:       #fdf6e7;
+    --ink:         #3a2a20;
+    --glass:       rgba(30, 22, 17, .42);
+    --font-display: "Jua", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    color-scheme: dark;
+  }
+
+  /* The published artifact wrapper supplies these; a plain file server does not,
+     so declare them here and both render identically. */
+  [hidden] { display: none !important; }
+  img { max-width: 100%; }
+
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--rock-deep);
+    color: var(--cream);
+    font-family: var(--font-display);
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .stage {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: var(--rock-deep) url("art/bg-mine.png") center / cover no-repeat;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    touch-action: manipulation;
+  }
+  .stage.shake { animation: shake .16s steps(2) 1; }
+  .stage.shake-big { animation: shakeBig .34s ease-out 1; }
+
+  @keyframes shake {
+    0%, 100% { transform: translate3d(0, 0, 0); }
+    25%      { transform: translate3d(-3px, 2px, 0); }
+    75%      { transform: translate3d(3px, -2px, 0); }
+  }
+  @keyframes shakeBig {
+    0%   { transform: translate3d(0, 0, 0); }
+    15%  { transform: translate3d(-10px, 6px, 0) rotate(-.6deg); }
+    35%  { transform: translate3d(9px, -5px, 0) rotate(.5deg); }
+    55%  { transform: translate3d(-6px, 3px, 0) rotate(-.3deg); }
+    75%  { transform: translate3d(4px, -2px, 0); }
+    100% { transform: translate3d(0, 0, 0); }
+  }
+
+  /* --- the gem --- */
+  .arena {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: 0;
+    padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+  }
+  .gembox { position: relative; display: grid; place-items: center; }
+  #gem {
+    width: min(52vw, 42vh);
+    height: auto;
+    max-width: 100%;
+    overflow: visible;
+    cursor: pointer;
+    filter: drop-shadow(0 10px 18px rgba(0, 0, 0, .45));
+    transform-origin: 50% 62%;
+    transition: transform .09s cubic-bezier(.3, 1.6, .5, 1);
+  }
+  #gem.squash { transform: scale(1.1, .88) translateY(3%); transition-duration: .05s; }
+  #gem.pop    { transform: scale(1.22); transition-duration: .12s; }
+  #gem.drop   { animation: drop .5s cubic-bezier(.2, 1.5, .4, 1) 1; }
+  @keyframes drop {
+    0%   { transform: translateY(-34%) scale(.3); opacity: 0; }
+    60%  { transform: translateY(0) scale(1.08); opacity: 1; }
+    100% { transform: translateY(0) scale(1); }
+  }
+
+  /* the gem that holds a friend: gold, glowing, and something moves inside */
+  #gem.sparkle {
+    --gem-core:  #efb13c;
+    --gem-light: #ffe9a8;
+    --gem-dark:  #bf7714;
+    --gem-glint: #fffdf2;
+    animation: gemGlow 1.2s ease-in-out infinite;
+  }
+  @keyframes gemGlow {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(255, 205, 100, .45)) drop-shadow(0 10px 18px rgba(0, 0, 0, .45)); }
+    50%      { filter: drop-shadow(0 0 26px rgba(255, 215, 130, .9))  drop-shadow(0 10px 18px rgba(0, 0, 0, .45)); }
+  }
+  /* a shadow, never the friend: the shape hints at who it is, the colours do not */
+  #inmate { opacity: 0; filter: brightness(0) saturate(0); }
+  #gem.sparkle #inmate { opacity: .42; animation: sway 2.6s ease-in-out infinite; }
+  @keyframes sway {
+    0%, 100% { transform: translateX(-2px) rotate(-1.5deg); }
+    50%      { transform: translateX(2px) rotate(1.5deg); }
+  }
+
+  .twinkles { position: absolute; inset: -12%; pointer-events: none; opacity: 0; }
+  .twinkles.on { opacity: 1; }
+  .twinkles i {
+    position: absolute;
+    width: 14px; height: 14px;
+    background: radial-gradient(circle, #fff 0 22%, rgba(255, 228, 160, .95) 38%, transparent 70%);
+    animation: tw 1.5s ease-in-out infinite;
+  }
+  @keyframes tw {
+    0%, 100% { transform: scale(.3) rotate(0deg); opacity: .2; }
+    50%      { transform: scale(1) rotate(90deg); opacity: 1; }
+  }
+
+  .crack { opacity: 0; }
+  .crack.on { opacity: 1; }
+
+  #flash {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 44%, #fff 0%, rgba(255, 255, 255, .7) 22%, transparent 62%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  #flash.go { animation: flash .34s ease-out 1; }
+  /* warm gold rather than a full white blast - this plays in a dark room */
+  #flash.big {
+    background: radial-gradient(circle at 50% 44%, #fffaf0 0%, rgba(255, 226, 158, .72) 26%, transparent 66%);
+    animation: flash .72s ease-out 1;
+  }
+  @keyframes flash {
+    0%   { opacity: 0; transform: scale(.5); }
+    12%  { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.3); }
+  }
+
+  /* canvas is a replaced element: without an explicit CSS size it lays out at its
+     backing-store size and spills past the stage */
+  #fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+  /* --- the new friend stepping out of the light --- */
+  #reveal {
+    position: absolute;
+    left: 0; top: 0;
+    pointer-events: none;
+    transform-origin: 50% 100%;
+    will-change: transform, filter;
+  }
+  #reveal img { display: block; height: 100%; width: auto; max-width: none; }
+  #reveal.dark img { filter: brightness(0) saturate(0); }
+  #reveal.lit  img { filter: none; transition: filter .45s ease-out; }
+
+  /* --- crew on the floor --- */
+  .crew {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: clamp(2px, 1.5vw, 10px);
+    padding-block: 0 calc(6px + env(safe-area-inset-bottom, 0px));
+    padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+    min-width: 0;
+  }
+  .crew img {
+    height: var(--crew-h, 92px);
+    width: auto;
+    display: block;
+    transform-origin: 50% 100%;
+    animation: bob 1.6s ease-in-out infinite;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .35));
+  }
+  .crew img:nth-child(2n) { animation-delay: -.5s; }
+  .crew img:nth-child(3n) { animation-delay: -.9s; }
+  @keyframes bob {
+    0%, 100% { transform: translateY(0) scaleY(1); }
+    50%      { transform: translateY(-4px) scaleY(1.02); }
+  }
+  .crew img.swing { animation: swing .22s ease-out 1; }
+  @keyframes swing {
+    0%   { transform: rotate(0) translateY(0); }
+    35%  { transform: rotate(-16deg) translateY(-6px); }
+    70%  { transform: rotate(9deg) translateY(1px) scaleY(.96); }
+    100% { transform: rotate(0) translateY(0); }
+  }
+
+  /* --- shard jar --- */
+  .jar {
+    position: absolute;
+    left: max(14px, env(safe-area-inset-left, 0px));
+    top: max(14px, env(safe-area-inset-top, 0px));
+    width: 56px;
+    pointer-events: none;
+  }
+  .jar.full { animation: jarPulse .7s ease-in-out 2; }
+  @keyframes jarPulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.14); }
+  }
+  #jarFill { transition: transform .45s cubic-bezier(.3, 1.3, .5, 1); transform-origin: 50% 100%; }
+
+  /* --- collection --- */
+  .dexBtn {
+    position: absolute;
+    right: max(14px, env(safe-area-inset-right, 0px));
+    top: max(14px, env(safe-area-inset-top, 0px));
+    width: 54px; height: 54px;
+    display: grid; place-items: center;
+    border: 2px solid rgba(253, 246, 231, .3);
+    background: rgba(26, 20, 16, .55);
+    border-radius: 18px;
+    cursor: pointer;
+    padding: 0;
+    backdrop-filter: blur(3px);
+  }
+  .dexBtn:active { transform: scale(.94); }
+  .dexBtn:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+  .dexBtn .badge {
+    position: absolute;
+    right: -6px; top: -6px;
+    min-width: 24px; height: 24px;
+    border-radius: 12px;
+    background: var(--gold);
+    color: var(--ink);
+    font-size: 13px;
+    display: grid; place-items: center;
+    border: 2px solid var(--rock-deep);
+  }
+
+  #dexPanel {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(26, 20, 16, .76);
+    backdrop-filter: blur(4px);
+    z-index: 5;
+    padding: max(16px, env(safe-area-inset-left, 0px));
+  }
+  .dexCard {
+    width: min(420px, 100%);
+    background: #4a3b31;
+    border: 3px solid var(--ink);
+    border-radius: 24px;
+    padding: 18px;
+    display: grid;
+    gap: 14px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, .5);
+  }
+  .dexGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    /* a definite row height, not aspect-ratio: a percentage height on the
+       portrait inside only resolves against a real height */
+    grid-auto-rows: 152px;
+    gap: 10px;
+  }
+  .slot {
+    border-radius: 16px;
+    background: rgba(253, 246, 231, .11);
+    border: 2px solid rgba(253, 246, 231, .16);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+  .slot img { max-height: 86%; max-width: 84%; width: auto; height: auto; }
+  .slot.locked img { filter: brightness(0) saturate(0); opacity: .42; }
+  .slot.got { background: rgba(244, 196, 90, .16); border-color: rgba(244, 196, 90, .5); }
+  .dexRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .dexClose, .dexReset {
+    font-family: var(--font-display);
+    border-radius: 999px;
+    cursor: pointer;
+    border: 2px solid var(--ink);
+  }
+  .dexClose { background: var(--gold); color: var(--ink); font-size: 18px; padding: 10px 26px; }
+  .dexReset { background: transparent; color: rgba(253, 246, 231, .55); border-color: transparent; font-size: 12px; padding: 8px 10px; }
+  .dexClose:focus-visible, .dexReset:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stage.shake, .stage.shake-big, #gem.drop, #gem.sparkle, .crew img,
+    .jar.full, .twinkles i, #gem.sparkle #inmate { animation: none; }
+    #flash.go, #flash.big { animation-duration: .12s; }
+  }
+</style>
+
+<div class="stage" id="stage">
+  <div class="arena" id="arena">
+    <div class="gembox">
+      <div class="twinkles" id="twinkles" aria-hidden="true"></div>
+      <svg id="gem" viewBox="0 0 200 240" role="button" tabindex="0" aria-label="보석 두드리기">
+        <defs>
+          <clipPath id="gemClip">
+            <path d="M100 8 L170 70 L148 212 L52 212 L30 70 Z"/>
+          </clipPath>
+          <linearGradient id="gTable" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="var(--gem-light)"/>
+            <stop offset="1" stop-color="var(--gem-core)"/>
+          </linearGradient>
+          <linearGradient id="gLeft" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="var(--gem-core)"/>
+            <stop offset="1" stop-color="var(--gem-dark)"/>
+          </linearGradient>
+          <linearGradient id="gRight" x1="1" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="var(--gem-light)"/>
+            <stop offset="1" stop-color="var(--gem-core)"/>
+          </linearGradient>
+        </defs>
+
+        <g id="gemBody">
+          <path d="M100 8 L170 70 L100 96 L30 70 Z"   fill="url(#gTable)"/>
+          <path d="M30 70 L100 96 L52 212 Z"          fill="url(#gLeft)"/>
+          <path d="M170 70 L148 212 L100 96 Z"        fill="url(#gRight)"/>
+          <path d="M100 96 L148 212 L52 212 Z"        fill="var(--gem-core)"/>
+        </g>
+
+        <!-- whoever is waiting inside, as a shadow you can just make out -->
+        <g clip-path="url(#gemClip)">
+          <image id="inmate" x="52" y="66" width="96" height="140"
+                 preserveAspectRatio="xMidYMax meet" style="transform-origin: 100px 206px"/>
+        </g>
+
+        <g>
+          <path d="M100 8 L170 70 L148 212 L52 212 L30 70 Z"
+                fill="none" stroke="var(--ink)" stroke-width="6" stroke-linejoin="round"/>
+          <path d="M62 62 L96 36 L104 44 L70 70 Z" fill="var(--gem-glint)" opacity=".85"/>
+          <path d="M118 150 L132 128 L139 136 L124 158 Z" fill="var(--gem-glint)" opacity=".4"/>
+        </g>
+
+        <g clip-path="url(#gemClip)" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <g stroke="var(--ink)" stroke-width="7">
+            <path class="crack" data-i="0" d="M100 118 L78 52 L88 14"/>
+            <path class="crack" data-i="1" d="M100 118 L152 78 L172 64"/>
+            <path class="crack" data-i="2" d="M100 118 L118 198 L110 220"/>
+            <path class="crack" data-i="3" d="M100 118 L44 142 L26 118"/>
+            <path class="crack" data-i="4" d="M100 118 L142 152 L166 196"/>
+            <path class="crack" data-i="5" d="M100 118 L68 172 L52 212"/>
+          </g>
+          <g stroke="var(--gem-glint)" stroke-width="2.5" opacity=".9">
+            <path class="crack" data-i="0" d="M100 118 L78 52 L88 14"/>
+            <path class="crack" data-i="1" d="M100 118 L152 78 L172 64"/>
+            <path class="crack" data-i="2" d="M100 118 L118 198 L110 220"/>
+            <path class="crack" data-i="3" d="M100 118 L44 142 L26 118"/>
+            <path class="crack" data-i="4" d="M100 118 L142 152 L166 196"/>
+            <path class="crack" data-i="5" d="M100 118 L68 172 L52 212"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+    <div id="flash"></div>
+  </div>
+
+  <div class="crew" id="crew"></div>
+
+  <div id="reveal" hidden><img alt="" id="revealImg"></div>
+
+  <svg class="jar" id="jar" viewBox="0 0 56 72" aria-hidden="true">
+    <rect x="18" y="2" width="20" height="7" rx="3" fill="var(--ink)" opacity=".75"/>
+    <path d="M10 14 h36 a4 4 0 0 1 4 4 v44 a6 6 0 0 1 -6 6 h-32 a6 6 0 0 1 -6 -6 v-44 a4 4 0 0 1 4 -4 z"
+          fill="var(--glass)" stroke="var(--ink)" stroke-width="3"/>
+    <clipPath id="jarClip">
+      <path d="M10 14 h36 a4 4 0 0 1 4 4 v44 a6 6 0 0 1 -6 6 h-32 a6 6 0 0 1 -6 -6 v-44 a4 4 0 0 1 4 -4 z"/>
+    </clipPath>
+    <g clip-path="url(#jarClip)">
+      <rect id="jarFill" x="8" y="14" width="40" height="54" fill="var(--shard)" transform="scale(1, 0)"/>
+    </g>
+    <path d="M10 14 h36 a4 4 0 0 1 4 4 v44 a6 6 0 0 1 -6 6 h-32 a6 6 0 0 1 -6 -6 v-44 a4 4 0 0 1 4 -4 z"
+          fill="none" stroke="var(--ink)" stroke-width="3"/>
+  </svg>
+
+  <button class="dexBtn" id="dexBtn" type="button" aria-label="친구 도감">
+    <svg viewBox="0 0 28 28" width="26" height="26" aria-hidden="true">
+      <path d="M5 4h14a2 2 0 0 1 2 2v18l-9-4-9 4V6a2 2 0 0 1 2-2z"
+            fill="rgba(253,246,231,.12)" stroke="var(--cream)" stroke-width="2" stroke-linejoin="round"/>
+      <circle cx="12" cy="11" r="3.2" fill="var(--gold)"/>
+    </svg>
+    <span class="badge" id="dexBadge">1</span>
+  </button>
+
+  <canvas id="fx"></canvas>
+
+  <div id="dexPanel" hidden role="dialog" aria-modal="true" aria-label="친구 도감">
+    <div class="dexCard">
+      <div class="dexGrid" id="dexGrid"></div>
+      <div class="dexRow">
+        <button class="dexReset" id="dexReset" type="button">처음부터</button>
+        <button class="dexClose" id="dexClose" type="button">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var FRIENDS = [
+    "art/sprites/char1-green.png",
+    "art/sprites/char2-blue.png",
+    "art/sprites/char3-pink.png",
+    "art/sprites/char4-lilac.png",
+    "art/sprites/char5-cream.png",
+    "art/sprites/char6-brown.png"
+  ];
+
+  /* --- tuning. D6 with the actual kid decides these. --- */
+  var CRACK_SLOTS      = 6;   // crack paths drawn on the gem
+  var BASE_CRACKS      = 4;   // taps for the first gems
+  var SHARDS_PER_GEM   = 12;
+  var JAR_BASE         = 30;  // shards for the first friend
+  var JAR_STEP         = 18;  // each later friend costs this much more
+  var SAVE_KEY         = "agit.save.v1";
+
+  var stage    = document.getElementById("stage");
+  var gem      = document.getElementById("gem");
+  var inmate   = document.getElementById("inmate");
+  var twinkles = document.getElementById("twinkles");
+  var flash    = document.getElementById("flash");
+  var crew     = document.getElementById("crew");
+  var jar      = document.getElementById("jar");
+  var jarFill  = document.getElementById("jarFill");
+  var reveal   = document.getElementById("reveal");
+  var revealImg= document.getElementById("revealImg");
+  var canvas   = document.getElementById("fx");
+  var ctx      = canvas.getContext("2d");
+  var dexBtn   = document.getElementById("dexBtn");
+  var dexBadge = document.getElementById("dexBadge");
+  var dexPanel = document.getElementById("dexPanel");
+  var dexGrid  = document.getElementById("dexGrid");
+  var cracks   = Array.prototype.slice.call(document.querySelectorAll(".crack"));
+  var reduced  = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var state = { found: 1, shards: 0, hits: 0, gems: 0, sparkle: false, busy: false };
+
+  function jarTarget() { return JAR_BASE + JAR_STEP * (state.found - 1); }
+  function cracksToBreak() { return BASE_CRACKS + Math.min(4, Math.floor(state.gems / 5)); }
+  function crackPerTap() { return 1 + Math.floor((state.found - 1) / 2); }
+  function allFound() { return state.found >= FRIENDS.length; }
+
+  /* ---------- save ---------- */
+  function save() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({
+        found: state.found, shards: state.shards, gems: state.gems, sparkle: state.sparkle
+      }));
+    } catch (e) { /* private window, blocked storage - the game still plays */ }
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      return (o && typeof o.found === "number") ? o : null;
+    } catch (e) { return null; }
+  }
+
+  /* ---------- sound: short blips, built on the fly so nothing has to load ---------- */
+  var audio = null;
+  function ac() {
+    if (!audio) {
+      var C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      try { audio = new C(); } catch (e) { return null; }
+    }
+    if (audio.state === "suspended") { audio.resume(); }
+    return audio;
+  }
+  function blip(freq, dur, type, gain) {
+    var a = ac(); if (!a) return;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type || "triangle";
+    o.frequency.setValueAtTime(freq, a.currentTime);
+    o.frequency.exponentialRampToValueAtTime(freq * 1.6, a.currentTime + dur);
+    g.gain.setValueAtTime(gain || .12, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001, a.currentTime + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(); o.stop(a.currentTime + dur);
+  }
+  function chime(notes, step) {
+    for (var i = 0; i < notes.length; i++) {
+      (function (f, n) {
+        setTimeout(function () { blip(f, .3, "sine", .1); }, n * (step || 110));
+      })(notes[i], i);
+    }
+  }
+  function crunch() {
+    var a = ac(); if (!a) return;
+    var len = Math.floor(a.sampleRate * .45);
+    var buf = a.createBuffer(1, len, a.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) { d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2); }
+    var src = a.createBufferSource(); src.buffer = buf;
+    var f = a.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 2200;
+    var g = a.createGain(); g.gain.value = .32;
+    src.connect(f); f.connect(g); g.connect(a.destination);
+    src.start();
+    blip(180, .5, "sawtooth", .1);
+  }
+  function buzz(ms) { if (navigator.vibrate) { try { navigator.vibrate(ms); } catch (e) {} } }
+
+  /* ---------- crew ---------- */
+  function renderCrew() {
+    crew.innerHTML = "";
+    for (var i = 0; i < state.found; i++) {
+      var img = document.createElement("img");
+      img.src = FRIENDS[i];
+      img.alt = "";
+      crew.appendChild(img);
+    }
+    // more friends means each one stands a little smaller so the row still fits
+    var h = Math.max(54, Math.min(96, Math.round(360 / state.found)));
+    crew.style.setProperty("--crew-h", h + "px");
+    dexBadge.textContent = String(state.found);
+  }
+  function swingCrew() {
+    var imgs = crew.children;
+    for (var i = 0; i < imgs.length; i++) {
+      (function (el, n) {
+        setTimeout(function () {
+          el.classList.remove("swing"); void el.offsetWidth; el.classList.add("swing");
+        }, n * 28);
+      })(imgs[i], i);
+    }
+  }
+
+  /* ---------- particles ---------- */
+  var bits = [];
+  function sizeCanvas() {
+    var r = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width  = Math.round(stage.clientWidth  * r);
+    canvas.height = Math.round(stage.clientHeight * r);
+    ctx.setTransform(r, 0, 0, r, 0, 0);
+  }
+  function gemCentre() {
+    var g = gem.getBoundingClientRect(), s = stage.getBoundingClientRect();
+    return { x: g.left - s.left + g.width / 2, y: g.top - s.top + g.height * .55, r: g.width / 2 };
+  }
+  function spray(n, power, colour) {
+    var c = gemCentre();
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var v = (1.6 + Math.random() * 3.4) * power;
+      bits.push({
+        x: c.x + Math.cos(a) * c.r * .35,
+        y: c.y + Math.sin(a) * c.r * .35,
+        vx: Math.cos(a) * v,
+        vy: Math.sin(a) * v - 2.4,
+        s: 3 + Math.random() * 7,
+        rot: Math.random() * Math.PI,
+        vr: (Math.random() - .5) * .3,
+        life: 1,
+        c: colour || "#e8c7ff"
+      });
+    }
+  }
+  var raf = null;
+  function tick() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (var i = bits.length - 1; i >= 0; i--) {
+      var b = bits[i];
+      b.vy += .38;
+      b.x += b.vx; b.y += b.vy; b.rot += b.vr;
+      b.life -= .014;
+      if (b.life <= 0) { bits.splice(i, 1); continue; }
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, b.life));
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.rot);
+      ctx.fillStyle = b.c;
+      ctx.strokeStyle = "#3a2a20";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, -b.s); ctx.lineTo(b.s * .8, 0); ctx.lineTo(0, b.s); ctx.lineTo(-b.s * .8, 0);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+    raf = bits.length ? requestAnimationFrame(tick) : null;
+  }
+  function startFx() { if (!raf) raf = requestAnimationFrame(tick); }
+
+  /* ---------- gem state ---------- */
+  function buildTwinkles() {
+    var spots = [[8, 18], [86, 10], [50, -4], [96, 62], [2, 70], [70, 92], [26, 96]];
+    for (var i = 0; i < spots.length; i++) {
+      var s = document.createElement("i");
+      s.style.left = spots[i][0] + "%";
+      s.style.top = spots[i][1] + "%";
+      s.style.animationDelay = (i * .19) + "s";
+      twinkles.appendChild(s);
+    }
+  }
+
+  function setSparkle(on) {
+    state.sparkle = on;
+    gem.classList.toggle("sparkle", on);
+    twinkles.classList.toggle("on", on);
+    if (on) {
+      inmate.setAttributeNS("http://www.w3.org/1999/xlink", "href", FRIENDS[state.found]);
+      inmate.setAttribute("href", FRIENDS[state.found]);
+    }
+  }
+
+  function showCracks(upTo) {
+    for (var i = 0; i < CRACK_SLOTS; i++) {
+      var on = i < upTo;
+      for (var k = 0; k < cracks.length; k++) {
+        if (Number(cracks[k].dataset.i) !== i) continue;
+        if (on && !cracks[k].classList.contains("on")) {
+          (function (el, n) { setTimeout(function () { el.classList.add("on"); }, n * 45); })(cracks[k], i);
+        } else if (!on) {
+          cracks[k].classList.remove("on");
+        }
+      }
+    }
+  }
+
+  function shake(big) {
+    if (reduced) return;
+    var cls = big ? "shake-big" : "shake";
+    stage.classList.remove(cls); void stage.offsetWidth; stage.classList.add(cls);
+  }
+
+  /* ---------- the hit ---------- */
+  function hit() {
+    if (state.busy || !dexPanel.hidden) return;
+
+    var need = cracksToBreak();
+    state.hits += crackPerTap();
+
+    gem.classList.add("squash");
+    setTimeout(function () { gem.classList.remove("squash"); }, 70);
+    swingCrew();
+
+    if (state.hits >= need) {
+      showCracks(CRACK_SLOTS);
+      shatter();
+      return;
+    }
+
+    showCracks(Math.min(CRACK_SLOTS, Math.round(state.hits / need * CRACK_SLOTS)));
+    shake(false);
+    buzz(12);
+    blip((state.sparkle ? 420 : 300) + state.hits * 110, .09);
+    spray(4 + crackPerTap() * 2, .6, state.sparkle ? "#ffe3a1" : "#e8c7ff");
+    startFx();
+  }
+
+  function shatter() {
+    state.busy = true;
+    var wasSparkle = state.sparkle;
+    shake(true);
+    buzz(wasSparkle ? [20, 30, 50, 30, 70] : [18, 28, 42]);
+    crunch();
+
+    gem.classList.add("pop");
+    setTimeout(function () {
+      gem.classList.remove("pop");
+      gem.style.visibility = "hidden";
+      twinkles.classList.remove("on");
+      flash.classList.remove("go", "big"); void flash.offsetWidth;
+      flash.classList.add(wasSparkle ? "big" : "go");
+      spray(wasSparkle ? 40 : 26, wasSparkle ? 1.9 : 1.5, wasSparkle ? "#ffe3a1" : "#e8c7ff");
+      startFx();
+      // the jar empties when the sparkle gem is spent, not when it appears, so a
+      // save reloaded with a full jar still pays for its friend
+      if (wasSparkle) { state.shards = 0; setJar(0); }
+      else { addShards(SHARDS_PER_GEM); }
+    }, 110);
+
+    state.gems++;
+
+    if (wasSparkle) {
+      setTimeout(meetFriend, 300);
+    } else {
+      // the slow beat before the next gem drops in - this pause is the reward
+      setTimeout(nextGem, reduced ? 320 : 640);
+    }
+  }
+
+  function nextGem() {
+    state.hits = 0;
+    showCracks(0);
+    setSparkle(!allFound() && state.shards >= jarTarget());
+    gem.style.visibility = "";
+    gem.classList.remove("drop"); void gem.offsetWidth; gem.classList.add("drop");
+    blip(state.sparkle ? 720 : 520, .14, "sine", .09);
+    if (state.sparkle) { chime([660, 880, 1180], 130); }
+    state.busy = false;
+    save();
+  }
+
+  /* ---------- the friend steps out ---------- */
+  // Timers drive this, never animation.onfinish: a backgrounded tab pauses Web
+  // Animations but keeps timers, and a reveal that never finished would leave
+  // state.busy stuck and the game unplayable.
+  function meetFriend() {
+    var RISE = reduced ? 200 : 620;
+    var HOLD = reduced ? 200 : 900;
+    var RUN  = reduced ? 150 : 560;
+
+    var idx = state.found;                       // the one that was inside
+    var sRect = stage.getBoundingClientRect();
+    var c = gemCentre();
+    var tall = Math.min(sRect.height * .42, 360);
+    var slot = null;
+    var ended = false;
+
+    revealImg.src = FRIENDS[idx];
+    reveal.hidden = false;
+    reveal.classList.remove("lit");
+    reveal.classList.add("dark");
+    reveal.style.height = tall + "px";
+    reveal.style.left = "0px";
+    reveal.style.top = "0px";
+
+    // place it standing on the spot the gem occupied
+    var rw = reveal.getBoundingClientRect().width || tall * .62;
+    var fromX = c.x - rw / 2;
+    var fromY = c.y + tall * .30 - tall;
+    var at = function (x, y, s) { return "translate(" + x + "px," + y + "px) scale(" + s + ")"; };
+
+    reveal.animate([
+      { transform: at(fromX, fromY + 40, .35), opacity: 0 },
+      { transform: at(fromX, fromY, 1.06), opacity: 1, offset: .55 },
+      { transform: at(fromX, fromY, 1), opacity: 1 }
+    ], { duration: RISE, easing: "cubic-bezier(.2,1.4,.4,1)", fill: "forwards" });
+
+    setTimeout(lightUp, RISE);
+    setTimeout(runToCrew, RISE + HOLD);
+    setTimeout(finish, RISE + HOLD + RUN + 40);
+
+    function lightUp() {
+      // colour floods in - "짠!"
+      reveal.classList.remove("dark");
+      reveal.classList.add("lit");
+      chime([523, 659, 784, 1046], 95);
+      buzz([14, 40, 14]);
+      spray(22, 1.2, "#ffe3a1");
+      startFx();
+      reveal.animate([
+        { transform: at(fromX, fromY, 1) },
+        { transform: at(fromX, fromY - 26, 1.1), offset: .4 },
+        { transform: at(fromX, fromY, 1) }
+      ], { duration: reduced ? 150 : 440, easing: "ease-out" });
+    }
+
+    function runToCrew() {
+      state.found = idx + 1;
+      renderCrew();
+      slot = crew.children[idx];
+      if (!slot) return;
+      slot.style.opacity = "0";
+      var sr = slot.getBoundingClientRect();
+      var toX = sr.left - sRect.left;
+      var toY = sr.top - sRect.top;
+      var sc = sr.height / tall;
+      reveal.animate([
+        { transform: at(fromX, fromY, 1) },
+        { transform: at((fromX + toX) / 2, fromY + (toY - fromY) * .35 - 30, ((1 + sc) / 2).toFixed(3)), offset: .5 },
+        { transform: at(toX, toY, sc.toFixed(3)) }
+      ], { duration: RUN, easing: "cubic-bezier(.4,.1,.3,1)", fill: "forwards" });
+      blip(880, .18, "sine", .08);
+    }
+
+    function finish() {
+      if (ended) return;
+      ended = true;
+      if (state.found === idx) { state.found = idx + 1; renderCrew(); }
+      if (slot) { slot.style.opacity = ""; }
+      reveal.hidden = true;
+      reveal.getAnimations().forEach(function (a) { a.cancel(); });
+      renderDex();
+      save();
+      nextGem();
+    }
+  }
+
+  /* ---------- jar ---------- */
+  function setJar(level) {
+    // SVG presentation attributes take scale(x, y); scaleY() is CSS-only and is
+    // rejected outright, which silently left the jar stuck at full.
+    jarFill.setAttribute("transform", "scale(1, " + level.toFixed(3) + ")");
+  }
+  function addShards(n) {
+    state.shards += n;
+    var target = jarTarget();
+    // all six found: nothing left to trade shards for, so the jar just sits full
+    if (allFound()) { state.shards = Math.min(state.shards, target); }
+    setJar(Math.min(1, state.shards / target));
+    if (state.shards >= target && !allFound()) {
+      jar.classList.remove("full"); void jar.offsetWidth; jar.classList.add("full");
+      setTimeout(function () { jar.classList.remove("full"); }, 1500);
+    }
+  }
+
+  /* ---------- collection ---------- */
+  function renderDex() {
+    dexGrid.innerHTML = "";
+    for (var i = 0; i < FRIENDS.length; i++) {
+      var slot = document.createElement("div");
+      slot.className = "slot " + (i < state.found ? "got" : "locked");
+      var img = document.createElement("img");
+      img.src = FRIENDS[i];
+      img.alt = "";
+      slot.appendChild(img);
+      dexGrid.appendChild(slot);
+    }
+  }
+  function openDex() { renderDex(); dexPanel.hidden = false; }
+  function closeDex() { dexPanel.hidden = true; }
+
+  /* ---------- wiring ---------- */
+  gem.addEventListener("pointerdown", function (e) { e.preventDefault(); hit(); });
+  gem.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hit(); }
+  });
+  dexBtn.addEventListener("click", openDex);
+  document.getElementById("dexClose").addEventListener("click", closeDex);
+  dexPanel.addEventListener("click", function (e) { if (e.target === dexPanel) closeDex(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDex(); });
+  document.getElementById("dexReset").addEventListener("click", function () {
+    state.found = 1; state.shards = 0; state.gems = 0; state.hits = 0;
+    setSparkle(false); setJar(0); renderCrew(); renderDex(); showCracks(0);
+    save(); closeDex();
+  });
+  window.addEventListener("resize", sizeCanvas);
+
+  function start(saved) {
+    var s = saved && saved.found ? saved : load();
+    if (s) {
+      state.found  = Math.min(FRIENDS.length, Math.max(1, s.found | 0));
+      state.shards = Math.max(0, s.shards | 0);
+      state.gems   = Math.max(0, s.gems | 0);
+    }
+    buildTwinkles();
+    renderCrew();
+    renderDex();
+    sizeCanvas();
+    setJar(Math.min(1, state.shards / jarTarget()));
+    setSparkle(!allFound() && state.shards >= jarTarget());
+  }
+
+  if (window.claude && window.claude.hot) {
+    window.claude.hot.snapshot(function () {
+      return { found: state.found, shards: state.shards, gems: state.gems };
+    });
+    if (window.claude.hot.ready) { window.claude.hot.ready(start); }
+    else { start(window.claude.hot.data || {}); }
+  } else {
+    start({});
+  }
+})();
+</script>
