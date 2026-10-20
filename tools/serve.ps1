@@ -1,4 +1,4 @@
-# Minimal static file server for previewing the game locally.
+﻿# Minimal static file server for previewing the game locally.
 #   .\tools\serve.ps1 -Port 8765
 param([int]$Port = 8765, [string]$Root = (Split-Path $PSScriptRoot -Parent))
 
@@ -10,6 +10,7 @@ $types = @{
   ".jpg"  = "image/jpeg"
   ".svg"  = "image/svg+xml"
   ".json" = "application/json; charset=utf-8"
+  ".webmanifest" = "application/manifest+json; charset=utf-8"
 }
 
 $listener = New-Object System.Net.HttpListener

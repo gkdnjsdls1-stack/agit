@@ -1,0 +1,17 @@
+{
+  "name": "아지트 광산",
+  "short_name": "아지트",
+  "description": "보석을 깨서 친구를 만나고 동물을 키우는 게임",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#3b3029",
+  "theme_color": "#3b3029",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
