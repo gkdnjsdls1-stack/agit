@@ -7,7 +7,7 @@
    문서(navigate)는 network-first 다. 배포가 "다음 다음 실행"이 아니라 바로
    다음 실행에 닿는다. 오프라인이면 캐시로 떨어진다.
    나머지(그림, manifest)는 cache-first - 바뀌는 일이 거의 없다. */
-var CACHE = "agit-v7";
+var CACHE = "agit-v8";
 var FILES = [
   "./",
   "./index.html",
