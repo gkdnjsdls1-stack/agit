@@ -118,7 +118,8 @@
   .tab b { font-size: 11px; font-weight: 400; line-height: 1; }
   .tab:active { transform: scale(.93); }
   .tab:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
-  .tab.nudge { color: var(--gold); animation: nudge 1.1s ease-in-out infinite; }
+  /* colour alone was gold-on-dim-cream, near invisible between pulses */
+  .tab.nudge { color: var(--gold); background: rgba(244, 196, 90, .2); animation: nudge 1.1s ease-in-out infinite; }
   @keyframes nudge {
     0%, 100% { transform: scale(1); }
     50%      { transform: scale(1.18); }
@@ -190,6 +191,8 @@
     transform-origin: 50% 62%;
     transition: transform .09s cubic-bezier(.3, 1.6, .5, 1);
   }
+  #gem:focus { outline: none; }
+  #gem:focus-visible { outline: 3px solid var(--gold); outline-offset: 6px; border-radius: 18px; }
   #gem.squash { transform: scale(1.1, .88) translateY(3%); transition-duration: .05s; }
   #gem.pop    { transform: scale(1.22); transition-duration: .12s; }
   #gem.drop   { animation: drop .5s cubic-bezier(.2, 1.5, .4, 1) 1; }
@@ -383,12 +386,23 @@
     font-size: 26px;
     animation: snooze 2.6s ease-in-out infinite;
   }
-  #zzz i:nth-child(2) { font-size: 34px; animation-delay: .5s; }
-  #zzz i:nth-child(3) { font-size: 44px; animation-delay: 1s; }
+  #zzz i:nth-child(2) { font-size: 46px; animation-delay: .5s; }
+  #zzz i:nth-child(3) { font-size: 60px; animation-delay: 1s; }
   @keyframes snooze {
-    0%        { transform: translateY(14px) rotate(-8deg); opacity: 0; }
-    30%, 60%  { opacity: .9; }
-    100%      { transform: translateY(-34px) rotate(10deg); opacity: 0; }
+    0%        { transform: translateY(14px) rotate(-8deg); opacity: .25; }
+    30%, 60%  { opacity: 1; }
+    100%      { transform: translateY(-40px) rotate(10deg); opacity: 0; }
+  }
+  /* "고장났어?" is the documented failure of this screen. Two faint letters were
+     not enough to say the mine is asleep rather than broken. */
+  #zzzWord {
+    position: absolute;
+    left: 50%; top: 63%;
+    transform: translateX(-50%);
+    font-size: 19px;
+    color: rgba(253, 246, 231, .78);
+    white-space: nowrap;
+    pointer-events: none;
   }
 
   /* --- pasture --- */
@@ -415,8 +429,8 @@
     border: 2px solid var(--ink);
     opacity: .92;
   }
-  .plot.sown .soil { background: #6b8e42; }
-  .plot.ready .soil { background: #7f9c41; }
+  .plot.sown .soil { background: var(--soil); }
+  .plot.ready .soil { background: #8d7a3a; }
   .plot .blades {
     position: relative;
     display: flex; align-items: flex-end;
@@ -436,7 +450,7 @@
   .plot .blades i {
     display: block;
     width: 10px;
-    height: calc(7px + var(--g, 0) * 7.5px);
+    height: calc(12px + var(--g, 0) * 6.5px);   /* visible the moment it is sown */
     border-radius: 6px 6px 2px 2px;
     background: #b4d16e;
     border: 1.5px solid #3f5a24;
@@ -704,6 +718,9 @@
   .btn.ghost.danger { color: #ffd9d9; background: #a7362f; border-color: var(--ink); }
   .btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 
+  /* the soft keyboard eats the bottom half of the screen; keep the card and its
+     buttons in the top third so nothing it needs sits under the keys */
+  #namePanel { align-items: start; padding-top: 6vh; }
   .nameCard { justify-items: center; text-align: center; }
   .nameCard img { height: 150px; width: auto; max-width: none; }
   #nameInput {
@@ -805,6 +822,7 @@
           </div>
           <div id="flash"></div>
           <div id="zzz" hidden aria-hidden="true"><i>z</i><i>z</i><i>z</i></div>
+        <div id="zzzWord" hidden aria-hidden="true">광산이 자러 갔어요</div>
         </div>
 
         <div class="ground" id="ground">
@@ -896,7 +914,7 @@
     <div class="card">
       <div class="dexGrid" id="dexGrid"></div>
       <div class="row">
-        <button class="btn ghost" id="dexCode" type="button">저장 코드</button>
+        <button class="btn ghost" id="dexCode" type="button">저장 코드(길게)</button>
         <button class="btn ghost" id="dexReset" type="button">처음부터(길게)</button>
         <button class="btn" id="dexClose" type="button">닫기</button>
       </div>
@@ -1199,9 +1217,13 @@
     rowBack.hidden = back.length === 0;
 
     dexBadge.textContent = String(state.found);
-    jar.toggleAttribute("hidden", allFound());   // nothing left for it to buy
-                                                 // (attribute, not .hidden: this is an SVG element)
+    paintJar();
     renderYard();
+  }
+  // Hidden whenever it cannot buy anything: all six home, or today's friend
+  // already met. (attribute, not .hidden: jar is an SVG element.)
+  function paintJar() {
+    jar.toggleAttribute("hidden", allFound() || state.friendToday);
   }
   function fillRow(row, list) {
     row.innerHTML = "";
@@ -1277,7 +1299,17 @@
     field.innerHTML = "";
     var h = Math.max(54, Math.min(96, Math.round(field.clientHeight * .095)));
 
+    // One patch at a time. Three "+" buttons on screen at once meant she tapped
+    // all three, all three grew at the same rate, and every animal in the game
+    // arrived in the same second - the pasture spent itself in one moment. A
+    // patch opens only once the animal before it has been welcomed home.
+    var open = 0;
+    while (open < ANIMALS.length && state.animals[open]) { open++; }
+
     for (var i = 0; i < ANIMALS.length; i++) {
+      // already-sown patches stay on screen, or a save made before this rule
+      // would strand its animals behind a patch that no longer renders
+      if (i > open && state.plots[i] < 0) { continue; }
       var a = ANIMALS[i], g = state.plots[i];
 
       var plot = document.createElement("div");
@@ -1485,13 +1517,20 @@
       inmate.setAttribute("href", FRIENDS[state.found]);
     }
   }
+  // Cracks appear on a stagger, so a timer from the gem that just shattered can
+  // still be in flight when the next one drops and paint it pre-cracked. The
+  // generation stamp makes a late timer from a spent gem do nothing.
+  var crackGen = 0;
   function showCracks(upTo) {
+    var gen = ++crackGen;
     for (var i = 0; i < CRACK_SLOTS; i++) {
       var on = i < upTo;
       for (var k = 0; k < cracks.length; k++) {
         if (Number(cracks[k].dataset.i) !== i) continue;
         if (on && !cracks[k].classList.contains("on")) {
-          (function (el, n) { setTimeout(function () { el.classList.add("on"); }, n * 45); })(cracks[k], i);
+          (function (el, n) {
+            setTimeout(function () { if (gen === crackGen) { el.classList.add("on"); } }, n * 45);
+          })(cracks[k], i);
         } else if (!on) {
           cracks[k].classList.remove("on");
         }
@@ -1510,6 +1549,7 @@
   function sleepMine() {
     pageMine.classList.add("asleep");
     $("zzz").hidden = false;
+    $("zzzWord").hidden = false;
     gem.style.visibility = "hidden";
     twinkles.classList.remove("on");
     showCracks(0);
@@ -1517,6 +1557,7 @@
   function wakeMine() {
     pageMine.classList.remove("asleep");
     $("zzz").hidden = true;
+    $("zzzWord").hidden = true;
     gem.style.visibility = "";
   }
 
@@ -1607,6 +1648,7 @@
   function nextGem() {
     state.hits = 0;
     playerHit = false;
+    paintJar();        // retires for the day once she has emptied it for a friend
     showCracks(0);
     if (mineAsleep()) {
       sleepMine();
@@ -1801,6 +1843,10 @@
     jarTop.setAttribute("opacity", level > .02 ? "1" : "0");
   }
   function addShards(n) {
+    // Today's friend has already come, so there is nothing the jar could buy.
+    // Filling it anyway left it sitting full for the other 25 gems of the day -
+    // a promise on screen that the game had no intention of keeping.
+    if (allFound() || state.friendToday) { return; }
     state.shards += n;
     var target = jarTarget();
     // never bank past a full jar: otherwise one long session buys several days
@@ -1866,9 +1912,20 @@
   });
 
   dexBtn.addEventListener("click", function () { renderDex(); dexPanel.hidden = false; });
+  // Both of these are a parent's controls sitting in a child's panel, so neither
+  // may be reachable by tapping. She pressed "저장 코드" out of curiosity and got
+  // a browser dialog full of raw JSON.
+  function onHold(el, fn) {
+    var t = null;
+    el.addEventListener("pointerdown", function () { clearTimeout(t); t = setTimeout(fn, 1200); });
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) {
+      el.addEventListener(ev, function () { clearTimeout(t); });
+    });
+  }
+
   // The whole game is one localStorage key on a parent's phone. A prompt is ugly
   // and it is also the only share sheet that needs no permission and no network.
-  $("dexCode").addEventListener("click", function () {
+  onHold($("dexCode"), function () {
     var cur = localStorage.getItem(SAVE_KEY) || "";
     var v = window.prompt("저장 코드예요. 복사해서 보관하세요.\n다른 코드를 붙여넣고 확인하면 그걸로 되돌립니다.", cur);
     if (!v || v === cur) return;
@@ -1887,25 +1944,19 @@
   // that, so it is a parent's control sitting in a child's panel. It stays -
   // somebody has to be able to start over - but a tap can no longer reach it:
   // arming needs a deliberate 1.2s hold, and confirming still needs a second tap.
-  var resetBtn = $("dexReset"), resetArmed = 0, resetTimer = null, holdTimer = null;
+  var resetBtn = $("dexReset"), resetArmed = 0, resetTimer = null;
   function disarmReset() {
     resetArmed = 0;
     resetBtn.textContent = "처음부터(길게)";
     resetBtn.classList.remove("danger");
   }
-  resetBtn.addEventListener("pointerdown", function () {
+  onHold(resetBtn, function () {
     if (resetArmed) return;
-    clearTimeout(holdTimer);
-    holdTimer = setTimeout(function () {
-      resetArmed = 1;
-      resetBtn.textContent = "정말 다 지울까?";
-      resetBtn.classList.add("danger");
-      clearTimeout(resetTimer);
-      resetTimer = setTimeout(disarmReset, 4000);
-    }, 1200);
-  });
-  ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) {
-    resetBtn.addEventListener(ev, function () { clearTimeout(holdTimer); });
+    resetArmed = 1;
+    resetBtn.textContent = "정말 다 지울까?";
+    resetBtn.classList.add("danger");
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(disarmReset, 4000);
   });
   resetBtn.addEventListener("click", function () {
     if (!resetArmed) return;       // a plain tap never arms it
@@ -1952,6 +2003,8 @@
   // the seam refills on its own, including while she has the app open
   function checkDay() {
     if (!rollDay()) return;
+    paintJar();                                        // a new day, a new friend
+    setJar(Math.min(1, state.shards / jarTarget()));
     if (pageMine.classList.contains("asleep")) {
       wakeMine();
       if (!state.busy) { nextGem(); }
