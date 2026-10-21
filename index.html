@@ -372,7 +372,7 @@
   /* --- ore on the rock face --- */
   .oreField { position: absolute; inset: 0; pointer-events: none; transition: opacity .25s ease; }
   /* one at a time: a live-looking ore that does nothing when tapped reads broken */
-  .oreField.dim { opacity: .3; pointer-events: none; }
+  .oreField.dim { opacity: .55; }
   .ore {
     position: absolute;
     transform: translate(-50%, -50%);   /* keyframes below use translate/scale so this survives */
@@ -1953,6 +1953,7 @@
   function renderOres() {
     oreField.innerHTML = "";
     for (var i = 0; i < state.ores.length; i++) {
+      if (state.ores[i] === openOre) { continue; }   // 지금 손에 든 것
       (function (o) {
         var c = o.g ? { core: "#efb13c", light: "#ffe9a8", dark: "#bf7714" } : ORES[o.c];
         var b = document.createElement("button");
@@ -2021,10 +2022,11 @@
 
   /* ---------- 원석을 열면 보석이 된다 ---------- */
   function openGem(o) {
-    if (busyOrBlocked() || openOre) return;
-    var k = state.ores.indexOf(o);
-    if (k < 0) return;
-    state.ores.splice(k, 1);
+    if (busyOrBlocked()) return;
+    if (openOre === o) return;
+    if (state.ores.indexOf(o) < 0) return;
+    // 벽에서 지우지 않는다. 깨져야 사라진다. 그래서 다른 원석을 누르면 그냥
+    // 그쪽으로 바뀌고, 열어둔 채 앱을 닫아도 원석을 잃지 않는다.
     openOre = o;
     state.hits = 0;
     showCracks(0);
@@ -2048,6 +2050,8 @@
     save();
   }
   function closeGem() {
+    var k = openOre ? state.ores.indexOf(openOre) : -1;
+    if (k >= 0) { state.ores.splice(k, 1); }   // 깨졌으니 이제 벽에서 없어진다
     openOre = null;
     state.hits = 0;
     gem.style.visibility = "hidden";
