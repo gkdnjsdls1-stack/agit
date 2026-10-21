@@ -2,7 +2,7 @@
    revalidate - but that also means a new version only reaches a phone that
    already has this installed when CACHE below changes. Bump it on every deploy.
    ponytail: no versioned filenames, bump CACHE by hand if that ever gets missed. */
-var CACHE = "agit-v4";
+var CACHE = "agit-v5";
 var FILES = [
   "./",
   "./index.html",

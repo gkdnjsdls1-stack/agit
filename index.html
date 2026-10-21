@@ -172,6 +172,7 @@
 
   .arena {
     position: relative;
+    pointer-events: none;      /* decoration only - the ore wall sits under it */
     display: grid;
     place-items: center;
     min-height: 0;
@@ -181,6 +182,7 @@
      empty stretch of cave floor between the gem and the crowd */
   .gembox { position: relative; display: grid; place-items: center; transform: translateY(11%); }
   #gem {
+    pointer-events: auto;      /* the one thing in .arena she can touch */
     width: min(52vw, 42vh);
     height: auto;
     max-width: 100%;
@@ -281,6 +283,7 @@
      recognisable and reads as a crowd instead of a line of specks. */
   .ground {
     position: relative;
+    pointer-events: none;      /* the crowd is scenery; it must not eat ore taps */
     display: flex;
     flex-direction: column;
     align-items: center;

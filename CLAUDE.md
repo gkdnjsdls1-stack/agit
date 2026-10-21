@@ -29,6 +29,13 @@
 - 도감에 배지를 붙이지 않는다. 금색 동그라미에 숫자는 읽지 않은 알림으로 읽힌다.
 
 ## 알려진 함정
+- **`.shaker` 는 그리드다.** `position:absolute` 로 깔아둔 레이어(`.oreField`)는
+  뒤에 오는 그리드 아이템(`.arena`, `.ground`)에 덮인다. 투명해서 보이기는 하는데
+  탭을 전부 가로챈다. 그래서 둘 다 `pointer-events:none` 이고 `#gem` 에서만 되살린다.
+  광산에 새 레이어를 올릴 때 같은 함정을 다시 밟기 쉽다.
+- **`el.click()` 으로 검증하지 말 것.** 히트테스트를 건너뛰어서 가려진 버튼도
+  "눌린다"고 나온다. 실제로 손가락이 닿는지 보려면
+  `document.elementsFromPoint(x, y)` 로 그 지점에 무엇이 쌓여 있는지 확인한다.
 - **CSS `@keyframes`에서 `transform`을 쓰지 말 것.** 요소에 걸어둔 `transform`을 통째로 덮어쓴다.
   공유 `bob`은 `translate`/`scale` 독립 속성을 쓴다 — `transform`으로 되돌리면 마당과 목장의
   모든 캐릭터가 발밑 정렬을 잃고 엔딩 사진에서 잘린다. `.tabs.hello`·`.plot .seed`·`waitHop`은
