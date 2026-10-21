@@ -64,5 +64,11 @@
 ## 저장과 배포
 - `localStorage`의 `agit.save.v1` 하나. 도감의 "저장 코드"가 유일한 백업 수단이다.
 - 리셋은 길게 눌러야 무장된다. 아이 손이 닿으면 안 되는 부모용 버튼이다.
-- `sw.js`는 cache-first다. **배포할 때마다 `CACHE` 문자열을 올려야** 폰에 새 버전이 간다.
-  새 파일을 추가하면 `FILES` 목록에도 넣는다.
+- `sw.js`: 문서는 network-first, 나머지는 cache-first.
+  install 은 `cache:"reload"` 로 받는다 — 그냥 `addAll` 하면 브라우저 HTTP 캐시의
+  옛 응답을 그대로 담아서, `CACHE` 이름만 바뀌고 내용은 어제 것인 캐시가 생긴다.
+  실제로 그 일이 있었고 배포가 폰에 닿지 않았다.
+  배포할 때 `CACHE` 를 올리고, 새 파일은 `FILES` 에도 넣는다.
+- **배포가 반영됐는지는 캐시 안의 내용으로 확인한다.** `caches.keys()` 가 새 이름을
+  보여줘도 그 안이 옛 파일일 수 있다:
+  `(await (await caches.match(location.href)).text()).includes("<새 코드 한 조각>")`
