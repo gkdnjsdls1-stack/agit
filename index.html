@@ -1455,9 +1455,9 @@
       ctx.save();
       ctx.globalAlpha = Math.max(0, Math.min(1, b.life));
       ctx.translate(b.x, b.y); ctx.rotate(b.rot);
-      ctx.fillStyle = b.c; ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 1.5;
+      ctx.fillStyle = b.c; ctx.strokeStyle = "#3a2a20"; ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(0, -b.s); ctx.lineTo(b.s * .8, 0); ctx.lineTo(0, b.s); ctx.lineTo(-b.s * .8, 0);
+      ctx.moveTo(0, -b.s); ctx.lineTo(b.s * .42, 0); ctx.lineTo(0, b.s); ctx.lineTo(-b.s * .42, 0);
       ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.restore();
     }
@@ -1939,7 +1939,11 @@
       sizeCanvas();
       placeDistant();
       var w = pageMine.clientWidth;
-      if (w !== lastW) { lastW = w; renderYard(); renderField(); }
+      if (w !== lastW) {
+        lastW = w;
+        renderYard(); renderField();
+        pager.scrollLeft = shownPage * w;   // px offsets do not survive a resize
+      }
     }, 150);
   });
   mineBg.addEventListener("load", placeDistant);
@@ -2019,18 +2023,26 @@
     for (i = 1; i <= 9; i++)  { frames.push(base - amp * Math.sin(i / 9 * Math.PI)); }
     for (i = 1; i <= 9; i++)  { frames.push(base + amp * Math.sin(i / 9 * Math.PI)); }
     frames.push(base);
-    var k = 0, snap = pager.style.scrollSnapType;
+    var k = 0, snap = pager.style.scrollSnapType, t = null;
     pager.style.scrollSnapType = "none";   // snapping would fight a partial scroll
-    var t = setInterval(function () {
-      if (k >= frames.length) {
-        clearInterval(t);
-        pager.style.scrollSnapType = snap;
-        pager.scrollLeft = base;
-        markTabs(MINE);
-        return;
-      }
+    // Finishing must never depend on the timer reaching the end. Hidden tabs get
+    // their intervals clamped to minutes, and a run that stops halfway leaves
+    // snapping off and the pager parked between pages - the first thing she sees
+    // is then the wrong screen with the mine tab lit.
+    function endTeach() {
+      if (!t) return;
+      clearInterval(t); t = null;
+      document.removeEventListener("visibilitychange", endTeach);
+      pager.style.scrollSnapType = snap;
+      pager.scrollLeft = base;
+      markTabs(MINE);
+    }
+    t = setInterval(function () {
+      if (k >= frames.length) { endTeach(); return; }
       pager.scrollLeft = frames[k++];
     }, 36);
+    setTimeout(endTeach, 3000);
+    document.addEventListener("visibilitychange", endTeach);
   }
 
   // Added to the home screen it has to open with no network. Nothing here
