@@ -775,6 +775,53 @@
   /* the soft keyboard eats the bottom half of the screen; keep the card and its
      buttons in the top third so nothing it needs sits under the keys */
   #namePanel { align-items: start; padding-top: 6vh; }
+  /* --- 친구와 이야기하기 --- */
+  /* 초상화는 크게 위에, 대사는 아래 상자에. 아무 데나 누르면 넘어간다 -
+     8살에게 "다음" 버튼을 찾게 하지 않는다. */
+  #talkPanel {
+    position: absolute;
+    inset: 0;
+    z-index: 7;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    background: rgba(26, 20, 16, .5);
+    backdrop-filter: blur(3px);
+    cursor: pointer;
+  }
+  #talkFace {
+    align-self: center;
+    height: min(40vh, 300px);
+    width: auto; max-width: none;
+    margin-bottom: -6px;
+    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, .5));
+    animation: talkIn .32s cubic-bezier(.2, 1.5, .4, 1) 1;
+  }
+  @keyframes talkIn {
+    0%   { translate: 0 18px; scale: .92; opacity: 0; }
+    100% { translate: 0 0;    scale: 1;   opacity: 1; }
+  }
+  #talkPanel .bubble {
+    margin: 0 max(14px, env(safe-area-inset-left, 0px));
+    background: var(--cream);
+    color: var(--ink);
+    border: 3px solid var(--ink);
+    border-radius: 20px;
+    padding: 13px 18px 10px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .45);
+  }
+  #talkWho { display: block; font-size: 15px; color: #8a6440; margin-bottom: 3px; }
+  #talkText { margin: 0; font-size: 21px; line-height: 1.45; min-height: 3em; }
+  #talkChoices { display: grid; gap: 8px; margin: 6px 0 4px; }
+  #talkChoices .btn { font-size: 17px; padding: 11px 16px; width: 100%; }
+  #talkMore { text-align: right; font-size: 17px; color: #8a6440; animation: moreBlink 1.1s ease-in-out infinite; }
+  @keyframes moreBlink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+
+  /* 마당의 친구를 누를 수 있게. .yard 는 pointer-events:none 이라 그림만 되살린다 */
+  .yard img { pointer-events: auto; cursor: pointer; }
+  .yard img:active { scale: .95; }
+
   .nameCard { justify-items: center; text-align: center; }
   .nameCard img { height: 150px; width: auto; max-width: none; }
   #nameInput {
@@ -795,7 +842,8 @@
     .shaker.shake, .shaker.shake-big, #gem.drop, #gem.sparkle, .rowLine img, .yard img,
     .dust.bump, .dust.short, .ore, .twinkles i, #gem.sparkle #inmate, .tab.nudge, .beast, .beast.waiting,
     .plot .price, .beast.picked, #agitBuilding.grew, #distantAgit.grew, #zzz i, .tabs.hello,
-    #ending .frame, #ending .shutter, .confetti i, .plot .blades.rustle { animation: none; }
+    #ending .frame, #ending .shutter, .confetti i, .plot .blades.rustle,
+    #talkFace, #talkMore { animation: none; }
     #flash.go, #flash.big { animation-duration: .12s; }
   }
 </style>
@@ -958,6 +1006,16 @@
     <div class="confetti" id="confetti"></div>
     <div class="frame"><div class="caption">다 모았다!</div></div>
     <div class="shutter"></div>
+  </div>
+
+  <div id="talkPanel" hidden role="dialog" aria-modal="true" aria-label="친구와 이야기">
+    <img id="talkFace" alt="">
+    <div class="bubble">
+      <b id="talkWho"></b>
+      <p id="talkText"></p>
+      <div id="talkChoices" hidden></div>
+      <div id="talkMore">▸</div>
+    </div>
   </div>
 
   <div id="dexPanel" class="panel" hidden role="dialog" aria-modal="true" aria-label="친구 도감">
@@ -1350,6 +1408,10 @@
       img.style.top = spot[1] + "%";
       img.style.setProperty("--yard-h", Math.round(base * spot[2]) + "px");
       img.style.animationDelay = (-n * .37) + "s";
+      if (n < FRIENDS.length) {
+        img.style.cursor = "pointer";
+        (function (k) { img.addEventListener("click", function () { talkTo(k); }); })(n);
+      }
       yard.appendChild(img);
       if (!name) return;
       var tag = document.createElement("b");
@@ -1664,7 +1726,7 @@
     shaker.classList.remove(cls); void shaker.offsetWidth; shaker.classList.add(cls);
   }
   function busyOrBlocked() {
-    return state.busy || !dexPanel.hidden || !namePanel.hidden;
+    return state.busy || !dexPanel.hidden || !namePanel.hidden || !talkPanel.hidden;
   }
 
   function sleepMine() {
@@ -1854,12 +1916,190 @@
     }
   }
 
+  /* ---------- 친구와 이야기하기 ----------
+     기획서 §11 의 여섯 역할 그대로. 대사는 게임 상태를 보고 고르니 같은 친구도
+     어제와 오늘이 다르다. 호감도나 점수는 없다 (§6) - 선택지는 답이 달라질 뿐
+     어디에도 쌓이지 않는다. */
+  function josa(name, withBatchim, without) {
+    var c = name.charCodeAt(name.length - 1);
+    if (c < 0xAC00 || c > 0xD7A3) return without;   // 한글이 아니면 받침 없음으로
+    return ((c - 0xAC00) % 28) ? withBatchim : without;
+  }
+  function petName(i) { return nameOf(PET_NAME0 + i) || ["토끼", "염소", "사슴"][i]; }
+  function someLevel() {
+    var n = 0;
+    for (var i = 0; i < 3; i++) { n += state.levels[i]; }
+    return n;
+  }
+
+  var TALK = [
+    [ // 1 🟢 주인공, 곡괭이
+      { if: function () { return mineAsleep(); },
+        l: ["오늘 캘 건 다 캤어.", "돌은 안 도망가니까, 내일 또 가자."] },
+      { if: function () { return allFound(); },
+        l: ["우리 여섯이 다 모였네.", "여기가 진짜 아지트가 됐어."] },
+      { l: ["손이 근질근질해.", "곡괭이 잘 드는 날이야."],
+        q: "같이 캐러 갈래?",
+        a: [{ t: "좋아!", l: ["그럼 제일 큰 걸로 고르자."] },
+            { t: "조금 쉴래", l: ["그래. 네가 여기 있으면 나도 좋아."] }] },
+      { l: ["처음엔 나 혼자였는데.", "이제 시끄러워서 좋아."] }
+    ],
+    [ // 2 🔵 보석 찾기, 고글
+      { if: function () { return state.dust >= 100; },
+        l: ["가루 엄청 모았네!", "뭐 살지 같이 골라줄까?"] },
+      { if: function () { return state.dust < DUST_PER_GEM; },
+        l: ["가루가 다 떨어졌네.", "괜찮아, 벽은 또 차올라."] },
+      { l: ["벽에서 반짝이는 거 보여?", "색깔마다 느낌이 달라."],
+        q: "무슨 색이 제일 좋아?",
+        a: [{ t: "보라색", l: ["역시! 제일 깊은 데서 나오는 색이야."] },
+            { t: "파란색", l: ["시원해 보이지. 나도 그거 좋아해."] },
+            { t: "초록색", l: ["아, 그거 찾기 제일 어려운데. 눈 좋다!"] }] },
+      { l: ["고글 써볼래?", "...조금 큰가?"] }
+    ],
+    [ // 3 🩷 동물 담당, 밀짚모자
+      { if: function () { return ownedCount() === 0; },
+        l: ["목장에 밭을 하나 사봐.", "누가 올지 궁금하지 않아?"] },
+      { if: function () { return someLevel() >= 12; },
+        l: ["요즘 다들 힘이 세졌어.", "네가 잘 돌봐줘서 그래."] },
+      { if: function () { return ownedCount() > 0; },
+        l: function () {
+          var n = petName(0);
+          for (var i = 0; i < 3; i++) { if (state.animals[i]) { n = petName(i); break; } }
+          return [n + josa(n, "은", "는") + " 잘 지내?", "풀 많이 주면 좋아해."];
+        } },
+      { l: ["동물은 거짓말을 안 해.", "배고프면 배고프다고 하거든."] }
+    ],
+    [ // 4 💜 조용한 아이, 두건
+      { if: function () { return agitStage() >= 3; },
+        l: ["집이 커졌네.", "...좋다."] },
+      { l: ["......", "(가만히 웃는다)"],
+        q: "옆에 있어도 돼?",
+        a: [{ t: "응", l: ["고마워."] },
+            { t: "나중에 올게", l: ["응. 나는 여기 있을게."] }] },
+      { l: ["여기 조용해서 좋아.", "소리가 잘 들려."] }
+    ],
+    [ // 5 🟡 풀·요리, 앞치마
+      { if: function () { for (var i = 0; i < 3; i++) { if (state.animals[i] && state.grass[i] >= GRASS_MAX) return true; } return false; },
+        l: ["밭에 풀이 다 자랐어!", "얼른 먹이러 가자."] },
+      { l: ["풀 냄새 좋지?", "잘 자란 풀은 냄새부터 달라."] },
+      { l: ["오늘 뭐 해줄까?"],
+        q: "뭐가 좋아?",
+        a: [{ t: "따뜻한 수프", l: ["좋아. 천천히 끓일게."] },
+            { t: "갓 구운 빵", l: ["조금만 기다려. 금방이야."] }] }
+    ],
+    [ // 6 🟤 힘 담당, 챙모자
+      { if: function () { return !allFound(); },
+        l: ["아직 안 온 친구가 있지?", "벽에 금색 원석이 뜨면 거기 있어."] },
+      { if: function () { return state.done; },
+        l: ["사진 잘 나왔더라.", "또 찍자."] },
+      { l: ["큰 돌은 나한테 맡겨.", "팔 좀 봐. 단단하지?"],
+        q: "진짜 세?",
+        a: [{ t: "엄청 세!", l: ["그렇지? 하하."] },
+            { t: "글쎄...", l: ["...내일 다시 물어봐."] }] }
+    ]
+  ];
+
+  var talkPanel = $("talkPanel"), talkFace = $("talkFace"), talkWho = $("talkWho");
+  var talkText = $("talkText"), talkChoices = $("talkChoices"), talkMore = $("talkMore");
+  var talkLast = [-1, -1, -1, -1, -1, -1];   // 같은 말을 연달아 하지 않게
+  var talkQueue = [], talkAsk = null, typing = null, typeFull = "";
+
+  function pickScene(i) {
+    var pool = TALK[i], hits = [], all = [], k;
+    for (k = 0; k < pool.length; k++) {
+      if (pool[k].if && !pool[k].if()) continue;
+      (pool[k].if ? hits : all).push(k);
+    }
+    var from = hits.length ? hits : all;
+    if (from.length > 1) {
+      var trimmed = from.filter(function (k2) { return k2 !== talkLast[i]; });
+      if (trimmed.length) { from = trimmed; }
+    }
+    var pick = from[Math.floor(Math.random() * from.length)];
+    talkLast[i] = pick;
+    return pool[pick];
+  }
+
+  function talkTo(i) {
+    if (!talkPanel.hidden) return;
+    var sc = pickScene(i);
+    var lines = typeof sc.l === "function" ? sc.l() : (sc.l || []).slice();
+    talkQueue = lines.slice();
+    talkAsk = sc.q ? { q: sc.q, a: sc.a } : null;
+    talkFace.src = FRIENDS[i];
+    talkWho.textContent = nameOf(i) || "친구";
+    talkChoices.hidden = true;
+    talkChoices.innerHTML = "";
+    talkPanel.hidden = false;
+    blip(680, .12, "sine", .07);
+    nextLine();
+  }
+
+  // 한 글자씩 찍힌다. 누르면 즉시 다 나오고, 다 나온 뒤 누르면 다음 줄.
+  function say(txt) {
+    clearInterval(typing);
+    typeFull = txt;
+    talkText.textContent = "";
+    talkMore.hidden = true;
+    if (reduced) { talkText.textContent = txt; typing = null; talkMore.hidden = false; return; }
+    var n = 0;
+    typing = setInterval(function () {
+      n++;
+      talkText.textContent = txt.slice(0, n);
+      if (n % 3 === 0) { blip(430 + Math.random() * 60, .03, "sine", .025, .2); }
+      if (n >= txt.length) { clearInterval(typing); typing = null; talkMore.hidden = false; }
+    }, 34);
+  }
+  function finishTyping() {
+    if (!typing) return false;
+    clearInterval(typing); typing = null;
+    talkText.textContent = typeFull;
+    talkMore.hidden = false;
+    return true;
+  }
+  function nextLine() {
+    if (talkQueue.length) { say(talkQueue.shift()); return; }
+    if (talkAsk) {
+      var ask = talkAsk; talkAsk = null;
+      say(ask.q);
+      talkMore.hidden = true;
+      talkChoices.innerHTML = "";
+      ask.a.forEach(function (opt) {
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "btn"; b.textContent = opt.t;
+        b.addEventListener("click", function (e) {
+          e.stopPropagation();
+          talkChoices.hidden = true;
+          talkQueue = (opt.l || []).slice();
+          blip(820, .12, "sine", .08);
+          nextLine();
+        });
+        talkChoices.appendChild(b);
+      });
+      talkChoices.hidden = false;
+      return;
+    }
+    closeTalk();
+  }
+  function closeTalk() {
+    clearInterval(typing); typing = null;
+    talkPanel.hidden = true;
+    talkChoices.hidden = true;
+    talkChoices.innerHTML = "";
+  }
+  talkPanel.addEventListener("click", function () {
+    if (!talkChoices.hidden) return;      // 선택지가 떠 있으면 골라야 넘어간다
+    if (finishTyping()) return;
+    nextLine();
+  });
+
   /* ---------- the ending ---------- */
   var ending = $("ending"), confetti = $("confetti"), shutter = ending.querySelector(".shutter");
   // buttons and tabs are not part of the photograph, and she will screenshot it
   function chrome(show) {
     dexBtn.hidden = !show; muteBtn.hidden = !show; tabs.hidden = !show;
     dustChip.hidden = !show;
+    if (!show) { closeTalk(); }
   }
   function playEnding() {
     goTo(AGIT_PAGE);
@@ -2147,7 +2387,9 @@
   $("dexClose").addEventListener("click", function () { dexPanel.hidden = true; });
   dexPanel.addEventListener("click", function (e) { if (e.target === dexPanel) dexPanel.hidden = true; });
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && namePanel.hidden) dexPanel.hidden = true;
+    if (e.key !== "Escape") return;
+    if (!talkPanel.hidden) { closeTalk(); return; }
+    if (namePanel.hidden) dexPanel.hidden = true;
   });
   // Wiping every friend she has collected is the single worst thing this game
   // can do, and it sat one stray tap away. Now it takes two deliberate taps.
